@@ -27,13 +27,16 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
             }
         },
         welcome: {
-            initial: 'prompt',
+            initial: 'starter',
             on: {
                 RECOGNISED: [
                     {
                         target: 'info',
                         cond: (context) => "title" in (grammar[context.recResult[0].utterance] || {}),
-                        actions: assign({ title: (context) => grammar[context.recResult[0].utterance].title! })
+                        actions: [
+                            assign({ title: (context) => grammar[context.recResult[0].utterance].title! }),
+                            (context, event) => console.log(context, event)
+                        ]
                     },
                     {
                         target: '.nomatch'
@@ -42,8 +45,12 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
                 TIMEOUT: '.prompt'
             },
             states: {
+                starter: {
+                  entry: say("Let's create a meeting."),
+                    on: { ENDSPEECH: 'prompt' }
+                },
                 prompt: {
-                    entry: say("Let's create a meeting. What is it about?"),
+                    entry: say("What is it about?"),
                     on: { ENDSPEECH: 'ask' }
                 },
                 ask: {
