@@ -37,6 +37,9 @@ interface SDSContext {
     audioCtx: any;
 
     title: string;
+    day: string;
+    time: string;
+
     category: string;
     joke: string;
 }
