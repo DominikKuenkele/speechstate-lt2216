@@ -39,6 +39,9 @@ interface SDSContext {
     title: string;
     day: string;
     time: string;
+    username: string;
+    celebrityName: string;
+    celebrityInfo: string;
 
     category: string;
     joke: string;
