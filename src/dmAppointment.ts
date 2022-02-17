@@ -260,7 +260,7 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
             entry: say(() => {
                 let options = "You can "
                 Object.values(menuGrammar).forEach((value) =>
-                    value["description"] != "" ? options += value["description"] + " or " : "")
+                    value["description"] !== "" ? options += value["description"] + " or " : "")
                 return options.substr(0, options.length - 4) + "."
             }),
             on: {
