@@ -25,3 +25,10 @@ yarn-error.log*
 
 # pycharm
 .idea
+
+# Latex
+*.aux
+*.log
+*.fls
+*.fdb_latexmk
+*.synctex.gz

@@ -4,6 +4,37 @@ function say(text: (context: SDSContext) => string): Action<SDSContext, any> {
     return send((_context: SDSContext) => ({type: "SPEAK", value: text(_context)}))
 }
 
+const menuGrammar: { [index: string]: { description: string, patterns: Array<RegExp> } } = {
+    "meeting": {
+        description: "create a meeting",
+        patterns: [
+            /Create a meeting./,
+            /I would like to schedule a meeting./
+        ]
+    },
+    "whois": {
+        description: "request information about a person",
+        patterns: [
+            /Who is (.*)\?/,
+            /Tell me something about (.*)\?/
+        ]
+    },
+    "stop": {
+        description: "stop me",
+        patterns: [
+            /Stop./,
+            /Shut up./
+        ]
+    },
+    "options": {
+        description: "",
+        patterns: [
+            /What can I do?/,
+            /How can you help me?/
+        ]
+    }
+}
+
 const titleGrammar: { [index: string]: string } = {
     "Lecture.": "Dialogue systems lecture",
     "Lunch.": "Lunch at the canteen",
@@ -35,6 +66,17 @@ const binaryGrammar: { [index: string]: Array<string> } = {
     "No": ["No.", "Nope.", "No no.", "Don't.", "Don't do it.", "No way.", "Not at all."]
 }
 
+const machineAnswers: { [index: string]: Array<string> } = {
+    "CR": [
+        "Sorry, could you please repeat that?",
+        "I didn't catch that?",
+        "What did you say?",
+        "Come again?",
+        "Sorry?",
+        "Huh?"
+    ]
+}
+
 function abstractPromptMachine(prompt: (context: SDSContext) => string): MachineConfig<SDSContext, any, SDSEvent> {
     return {
         initial: 'prompt',
@@ -47,7 +89,7 @@ function abstractPromptMachine(prompt: (context: SDSContext) => string): Machine
                 entry: send('LISTEN'),
             },
             nomatch: {
-                entry: say(() => "Sorry, could you please repeat that?"),
+                entry: say(() => machineAnswers["CR"][Math.random() * machineAnswers["CR"].length | 0]),
                 on: {ENDSPEECH: 'ask'}
             }
         }
@@ -180,25 +222,49 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
                 RECOGNISED: [
                     {
                         target: 'createMeeting',
-                        cond: context => "Create a meeting." == (context.recResult[0].utterance)
+                        cond: context => menuGrammar["meeting"]["patterns"].some((regex) => regex.test(context.recResult[0].utterance))
                     },
                     {
                         target: 'askForCelebrity',
-                        cond: context => /Who is .*/.test(context.recResult[0].utterance),
+                        cond: context => menuGrammar["whois"]["patterns"].some((regex) => regex.test(context.recResult[0].utterance)),
                         actions: assign({
                             celebrityName:
-                                context => context.recResult[0].utterance.replace("Who is ", "").replace("?", "")
+                                context => {
+                                    for (let pattern of menuGrammar["whois"]["patterns"]) {
+                                        let regexExec = pattern.exec(context.recResult[0].utterance)!;
+                                        if (regexExec !== null && regexExec[1] !== undefined) {
+                                            return regexExec[1]
+                                        }
+                                    }
+                                    //will never happen, since cond verifies it already before
+                                    return ""
+                                }
                         })
                     },
                     {
+                        target: 'menuHelp',
+                        cond: context => menuGrammar["options"]["patterns"].some((regex) => regex.test(context.recResult[0].utterance))
+                    },
+                    {
                         target: 'init',
-                        cond: context => context.recResult[0].utterance === "Stop."
+                        cond: context => menuGrammar["stop"]["patterns"].some((regex) => regex.test(context.recResult[0].utterance))
                     },
                     {
                         target: '.nomatch'
                     }
                 ],
                 TIMEOUT: '.prompt'
+            }
+        },
+        menuHelp: {
+            entry: say(() => {
+                let options = "You can "
+                Object.values(menuGrammar).forEach((value) =>
+                    value["description"] != "" ? options += value["description"] + " or " : "")
+                return options.substr(0, options.length - 4) + "."
+            }),
+            on: {
+                ENDSPEECH: "welcome.ask"
             }
         },
         askForCelebrity: {
