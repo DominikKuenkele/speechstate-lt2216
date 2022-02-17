@@ -1,15 +1,22 @@
-import {Action, ActionTypes, assign, AssignAction, MachineConfig, PropertyAssigner, send} from "xstate";
+import {Action, ActionTypes, assign, AssignAction, MachineConfig, PropertyAssigner, send,} from "xstate";
 
-function say(text: string): Action<SDSContext, SDSEvent> {
-    return send((_context: SDSContext) => ({type: "SPEAK", value: text}))
+function say(text: (context: SDSContext) => string): Action<SDSContext, any> {
+    return send((_context: SDSContext) => ({type: "SPEAK", value: text(_context)}))
 }
 
-const grammar: { [index: string]: { title?: string, day?: string, time?: string } } = {
-    "Lecture.": {title: "Dialogue systems lecture"},
-    "Lunch.": {title: "Lunch at the canteen"},
-
-    "At 10": {time: "10:00"},
+const titleGrammar: { [index: string]: string } = {
+    "Lecture.": "Dialogue systems lecture",
+    "Lunch.": "Lunch at the canteen",
+    "Training.": "Workout at the gym",
+    "Cinema.": "Watching a movie at the cinema",
+    "Shopping.": "Shopping in the city",
+    "Swedish course.": "Learning swedish",
+    "President.": "Talking to the president",
+    "Garden": "Walk in the garden",
+    "Sleeping": "Taking a nap"
 }
+
+const timeGrammar: RegExp = /(At )?(((1[0-2]|[1-9]):[0-5][0-9]|(1[0-2]|[1-9]))( [AP]M)?( o'clock)?\.?)/
 
 const dayGrammar: string[] = [
     "Monday",
@@ -24,26 +31,23 @@ const dayGrammar: string[] = [
 ]
 
 const binaryGrammar: { [index: string]: Array<string> } = {
-    "Yes": ["Yes.", "Of course."],
-    "No": ["No."]
+    "Yes": ["Yes.", "Of course.", "Sure.", "Yeah.", "Yes please.", "Yep.", "OK.", "Yes, thank you."],
+    "No": ["No.", "Nope.", "No no.", "Don't.", "Don't do it.", "No way.", "Not at all."]
 }
 
-function abstractPromptMachine(prompt: string): MachineConfig<SDSContext, any, SDSEvent> {
+function abstractPromptMachine(prompt: (context: SDSContext) => string): MachineConfig<SDSContext, any, SDSEvent> {
     return {
         initial: 'prompt',
-        on: {
-            TIMEOUT: '.prompt'
-        },
         states: {
             prompt: {
-                entry: say(prompt),
+                entry: say(context => prompt(context)),
                 on: {ENDSPEECH: 'ask'}
             },
             ask: {
                 entry: send('LISTEN'),
             },
             nomatch: {
-                entry: say("Sorry, could you please repeat that?"),
+                entry: say(() => "Sorry, could you please repeat that?"),
                 on: {ENDSPEECH: 'ask'}
             }
         }
@@ -53,7 +57,7 @@ function abstractPromptMachine(prompt: string): MachineConfig<SDSContext, any, S
 function verifyUtterance(utterance: string, category: string): boolean {
     switch (category) {
         case "title":
-            return "title" in (grammar[utterance] || {})
+            return utterance in titleGrammar
         case "day":
             for (const day of dayGrammar) {
                 if (utterance.includes(day)) {
@@ -62,7 +66,7 @@ function verifyUtterance(utterance: string, category: string): boolean {
             }
             return false;
         case "time":
-            return "time" in (grammar[utterance] || {})
+            return timeGrammar.test(utterance)
         default:
             return false;
     }
@@ -72,13 +76,19 @@ function getAssignActionFor(category: string): AssignAction<SDSContext, any> {
     let assigner: PropertyAssigner<SDSContext, any>;
     switch (category) {
         case "title":
-            assigner = {title: (context) => grammar[context.recResult[0].utterance].title!};
+            assigner = {title: (context) => titleGrammar[context.recResult[0].utterance]};
             break;
         case "day":
             assigner = {day: (context) => dayGrammar.find(day => context.recResult[0].utterance.includes(day))!};
             break;
         case "time":
-            assigner = {time: (context) => grammar[context.recResult[0].utterance].time!}
+            assigner = {
+                time: (context) => {
+                    let regexExec = timeGrammar.exec(context.recResult[0].utterance)!;
+                    // use number/time and add AM/PM if existing
+                    return regexExec[3] + (regexExec[6] !== undefined ? regexExec[6] : "")
+                }
+            }
             break;
         default:
             assigner = {}
@@ -88,7 +98,8 @@ function getAssignActionFor(category: string): AssignAction<SDSContext, any> {
         assignment: assigner
     }
 }
-function categoryPromptMachine(prompt: string, category: string, target: string): MachineConfig<SDSContext, any, SDSEvent> {
+
+function categoryPromptMachine(prompt: (context: SDSContext) => string, category: string, target: string): MachineConfig<SDSContext, any, SDSEvent> {
     return {
         ...abstractPromptMachine(prompt),
         on: {
@@ -101,12 +112,13 @@ function categoryPromptMachine(prompt: string, category: string, target: string)
                 {
                     target: '.nomatch'
                 }
-            ]
+            ],
+            TIMEOUT: '.prompt'
         }
     };
 }
 
-function binaryPromptMachine(prompt: string, targetTrue: string, targetFalse: string): MachineConfig<SDSContext, any, SDSEvent> {
+function binaryPromptMachine(prompt: (context: SDSContext) => string, targetTrue: string, targetFalse: string): MachineConfig<SDSContext, any, SDSEvent> {
     return {
         ...abstractPromptMachine(prompt),
         on: {
@@ -123,6 +135,7 @@ function binaryPromptMachine(prompt: string, targetTrue: string, targetFalse: st
                     target: '.nomatch'
                 }
             ],
+            TIMEOUT: '.prompt'
         }
     };
 }
@@ -137,22 +150,32 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
         },
         init: {
             on: {
-                TTS_READY: 'hello',
-                CLICK: 'hello'
+                TTS_READY: 'getUsername',
+                CLICK: 'getUsername'
             }
         },
-        hello: {
-            entry: send((context) => ({
-                type: 'SPEAK',
-                value: `Hi ${context.username !== undefined ? context.username : 'Anonymous'}!`
-            })),
+        getUsername: {
+            ...abstractPromptMachine(() => 'Hi, who are you?'),
             on: {
-                ENDSPEECH: 'welcome'
+                RECOGNISED: [
+                    {
+                        target: 'welcome',
+                        cond: context => context.recResult[0].utterance === "I don't want to be known."
+                    },
+                    {
+                        target: 'welcome',
+                        actions: assign({
+                            username: context => context.recResult[0].utterance
+                        })
+                    }
+                ],
+                TIMEOUT: '.prompt'
             }
         },
         welcome: {
-            ...abstractPromptMachine(""),
-            initial: 'ask',
+            ...abstractPromptMachine(
+                (context) => `How can I help you, ${context.username !== undefined ? context.username : 'Anonymous'}!`
+            ),
             on: {
                 RECOGNISED: [
                     {
@@ -168,9 +191,14 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
                         })
                     },
                     {
+                        target: 'init',
+                        cond: context => context.recResult[0].utterance === "Stop."
+                    },
+                    {
                         target: '.nomatch'
                     }
-                ]
+                ],
+                TIMEOUT: '.prompt'
             }
         },
         askForCelebrity: {
@@ -178,22 +206,20 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
                 src: context => kbRequest(context.celebrityName),
                 onDone: {
                     target: 'infoCelebrity',
+                    // get only the first sentence of the Abstract
                     actions: assign({celebrityInfo: (context, event) => event.data["Abstract"].split(/\. [A-Z]/)[0]})
                 },
                 onError: {
                     target: 'meetingCelebrity',
-                    actions: send(context => ({
-                        type: "SPEAK",
-                        value: `Sorry, I didn't get any info about ${context.celebrityName}`
-                    }))
+                    actions: say(context => `Sorry, I didn't get any info about ${context.celebrityName}`)
                 }
             }
         },
         infoCelebrity: {
-            entry: send(context => ({
-                type: "SPEAK",
-                value: context.celebrityInfo !== "" ? context.celebrityInfo : `I couldn't find any info about ${context.celebrityName}!`
-            })),
+            entry: say(context =>
+                context.celebrityInfo !== ""
+                    ? context.celebrityInfo
+                    : `I couldn't find any info about ${context.celebrityName}!`),
             on: {
                 ENDSPEECH: {
                     target: 'meetingCelebrity',
@@ -204,38 +230,37 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
             }
         },
         meetingCelebrity: {
-            ...binaryPromptMachine("Do you want to meet them?", 'getDay', 'init')
+            ...binaryPromptMachine(() => "Do you want to meet them?", 'getDay', 'welcome')
         },
         createMeeting: {
-            entry: say("Let's create a meeting."),
+            entry: say(() => "Let's create a meeting."),
             on: {
                 ENDSPEECH: 'getTitle'
             }
         },
         getTitle: {
-            ...categoryPromptMachine("What is it about?", "title", 'getDay'),
+            ...categoryPromptMachine(() => "What is it about?", "title", 'getDay'),
         },
         getDay: {
-            ...categoryPromptMachine("On which day is it?", "day", 'wholeDay'),
+            ...categoryPromptMachine(() => "On which day is it?", "day", 'wholeDay'),
         },
         wholeDay: {
-            ...binaryPromptMachine('Will it take the whole day?', 'confirmation', 'getTime')
+            ...binaryPromptMachine(() => 'Will it take the whole day?', 'confirmation', 'getTime')
         },
         getTime: {
-            ...categoryPromptMachine("What time is your meeting?", "time", 'confirmation'),
+            ...categoryPromptMachine(() => "What time is your meeting?", "time", 'confirmation'),
         },
         confirmation: {
-            entry: send((context) => ({
-                type: "SPEAK",
-                value: `Do you want me to create a meeting titled ${context.title} on ${context.day} `
-                    + `${context.time !== undefined ? `at ${context.time}` : `for the whole day`}?`
-            })),
-            on: {ENDSPEECH: '.ask'},
-            ...binaryPromptMachine("", 'info', 'getTitle')
+            ...binaryPromptMachine(
+                (context) =>
+                    `Do you want me to create a meeting titled ${context.title} on ${context.day} `
+                    + `${context.time !== undefined ? `at ${context.time}` : `for the whole day`}?`,
+                'info',
+                'welcome')
         },
         info: {
-            entry: say("Your meeting has been created!"),
-            on: {ENDSPEECH: 'init'}
+            entry: say(() => "Your meeting has been created!"),
+            on: {ENDSPEECH: 'welcome'}
         }
     }
 })
