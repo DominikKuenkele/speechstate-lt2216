@@ -1,0 +1,13 @@
+<!--ID=B7267351-473F-409D-9765-754A8EBCDE05;Version=1|{"VoiceNameToIdMapItems":[{"Id":"e4fbab32-f3f3-4943-b4db-0d8a7469b383","Name":"Microsoft Server Speech Text to Speech Voice (en-GB, LibbyNeural)","ShortName":"en-GB-LibbyNeural","Locale":"en-GB","VoiceType":"StandardVoice"}]}-->
+<!--ID=5B95B1CC-2C7B-494F-B746-CF22A0E779B7;Version=1|{"Locales":{"en-GB":{"AutoApplyCustomLexiconFiles":[{}]}}}-->
+<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xmlns:emo="http://www.w3.org/2009/10/emotionml" version="1.0" xml:lang="en-GB"><voice name="en-GB-LibbyNeural"><prosody contour="(72%, +4%) (100%, +86%)">I have your calendar open.</prosody>
+<prosody contour="(54%, +8%) (94%, +83%)">For what date?</prosody>
+<prosody contour="(80%, +21%) (99%, +85%)">What time would you like to start?</prosody>
+<prosody contour="(20%, +19%) (31%, +75%) (42%, +15%) (79%, +2%) (95%, +70%)">How much time do you want to block out?</prosody>
+<prosody contour="(80%, +18%) (97%, +64%)">What shall we call this?</prosody>
+Ok. <prosody contour="(40%, +27%) (49%, +90%) (58%, +27%)">I will add the dinner </prosody>with Markus <break time="20ms" />on the 5th of March at 7pm for an hour to the calendar.</voice></speak>
+
+<!--
+I used the Azure Speech Studio. To add ssml tags easier, I substituted the ssml breaks with line breaks.
+In my view, the speech sounded quiet well. So I added almost only prosodies to emphasize certain words or let the sentence sound more like a questions.    
+-->

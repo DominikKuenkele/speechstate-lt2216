@@ -1,0 +1,9 @@
+<!--ID=B7267351-473F-409D-9765-754A8EBCDE05;Version=1|{"VoiceNameToIdMapItems":[{"Id":"e4fbab32-f3f3-4943-b4db-0d8a7469b383","Name":"Microsoft Server Speech Text to Speech Voice (en-GB, LibbyNeural)","ShortName":"en-GB-LibbyNeural","Locale":"en-GB","VoiceType":"StandardVoice"}]}-->
+<!--ID=5B95B1CC-2C7B-494F-B746-CF22A0E779B7;Version=1|{"Locales":{"en-GB":{"AutoApplyCustomLexiconFiles":[{}]}}}-->
+<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xmlns:emo="http://www.w3.org/2009/10/emotionml" version="1.0" xml:lang="en-GB"><voice name="en-GB-LibbyNeural">The biggest <prosody contour="(2%, +33%) (97%, +32%)">loser</prosody> among the top 10 <prosody contour="(0%, +66%) (41%, -31%)">cryptocurrencies</prosody> is bitcoin cash (BCH), down <phoneme alphabet="ipa" ph="tɛnpɔɪntfɪftɪeɪt">10.58</phoneme> percent in the last 24 hours. It's also down <sub alias="twentyfour point eleven">24.11</sub> percent from the recent high of $1,641.40.</voice></speak>
+
+<!--
+I used the Azure Speech Studio. 
+In my view, the speech sounded already quiet well and the hinted mistakes in the instructions didn't all appear for me.
+Therfore, I couldn't use add all suggested tags, since they would have made it worse.
+-->
