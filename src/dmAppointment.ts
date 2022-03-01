@@ -273,7 +273,7 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
                 onDone: {
                     target: 'infoCelebrity',
                     // get only the first sentence of the Abstract
-                    actions: assign({celebrityInfo: (context, event) => event.data["Abstract"].split(/\. [A-Z]/)[0]})
+                    actions: assign({celebrityInfo: (context, event) => event.data["Abstract"]})
                 },
                 onError: {
                     target: 'meetingCelebrity',
