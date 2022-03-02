@@ -13,4 +13,23 @@
         <grapheme>Paris Saint-Germain</grapheme>
         <phoneme>pa.ʁi.sɛ̃.t‿ʒɛʁ.mɛ̃</phoneme>
     </lexeme>
+    <lexeme>
+        <grapheme>Michael Schumacher</grapheme>
+        <phoneme>ˈmɪçaːʔeːl.ʃuːˈmaxɐ</phoneme>
+    </lexeme>
 </lexicon>
+
+<!--
+To be honest, the pronunciation of almost all words was in my view really good. The most problems that occurred, were
+foreign words from different languages as also names from different languages. These were pronounced in an english
+way. I added some to the dictionary, but in my view a dictionary is not the right place to correct these kinds of
+problems, since in theory all foreign words/names would need to be added here. It would be more efficient
+if the system itself could recognize the foreign language and fetch the correct pronunciation.
+Furthermore, I added the word 'controversy' in the lexicon. Actually, it was pronounced correctly in American English.
+The British English pronunciation (stress on second syllable) seems nonetheless more natural to me, so I switched
+the accent to BE in that case.
+
+Apart from the single words, the pronunciation problems were more on sentence level. Sometimes, the breaks were too long
+("What can I do for you, [break] Dominik?") or ar question was pronounced more as a statement (no pitch change in the end).
+But these problems can't be solved, with a lexicon.
+-->
