@@ -1,0 +1,5 @@
+Reference for Part C: https://www.youtube.com/watch?v=XdhpA2yPu1w
+
+VG Part:
+https://github.com/DominikKuenkele/speechstate-lt2216
+I included the lexicon under the public folder that it is deployed to the gh pages. In the xml file, I added also a small comment, in which I explain, what I added and why.
