@@ -1,7 +1,7 @@
 {
   "name": "speechstate",
-    "version": "0.1.0",
-    "license": "GPL-3.0",
+  "version": "0.1.0",
+  "license": "GPL-3.0",
   "homepage": "http://localhost/speechstate-lt2216",
   "private": true,
   "dependencies": {
