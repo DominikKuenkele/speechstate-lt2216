@@ -59,4 +59,6 @@ type SDSEvent =
     | { type: 'ENDSPEECH' }
     | { type: 'LISTEN' }
     | { type: 'TIMEOUT' }
+    | { type: 'RECSTOP' }
+    | { type: 'HIST' }
     | { type: 'SPEAK', value: string };
