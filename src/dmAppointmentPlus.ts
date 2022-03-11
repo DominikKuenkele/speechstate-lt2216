@@ -1,10 +1,12 @@
 import {Action, ActionTypes, assign, AssignAction, MachineConfig, PropertyAssigner, send, StatesConfig,} from "xstate";
 
+const CONFIDENCE_THRESHOLD = 0.8;
+
 function say(text: (context: SDSContext) => string): Action<SDSContext, any> {
     return send((_context: SDSContext) => ({type: "SPEAK", value: text(_context)}))
 }
 
-const menuGrammar: { [index: string]: { description: string, patterns: Array<RegExp> } } = {
+const menuGrammar: { [index: string]: { description: string, patterns: RegExp[] } } = {
     "meeting": {
         description: "create a meeting",
         patterns: [
@@ -68,12 +70,12 @@ const dayGrammar: string[] = [
     "Tomorrow"
 ];
 
-const binaryGrammar: { [index: string]: Array<string> } = {
+const binaryGrammar: { [index: string]: string[] } = {
     "Yes": ["Yes.", "Of course.", "Sure.", "Yeah.", "Yes please.", "Yep.", "OK.", "Yes, thank you."],
     "No": ["No.", "Nope.", "No no.", "Don't.", "Don't do it.", "No way.", "Not at all."]
 };
 
-const machineAnswers: { [index: string]: Array<string> } = {
+const machineAnswers: { [index: string]: string[] } = {
     "CR": [
         "Sorry, could you please repeat that?",
         "I didn't catch that?",
@@ -175,19 +177,54 @@ function getAssignActionFor(category: string): AssignAction<SDSContext, any> {
     }
 }
 
+function getVerificationRequest(category: string): (context: SDSContext) => string {
+    switch (category) {
+        case "title":
+            return context => `For ${context.title}?`;
+        case "day":
+            return context => `On ${context.day}?`;
+        case "time":
+            return context => `At ${context.time}?`;
+        default:
+            // will never happen
+            return () => "";
+    }
+}
+
 function categoryPromptMachine(prompt: ((context: SDSContext) => string)[], category: string, target: string): MachineConfig<SDSContext, any, SDSEvent> {
     return {
-        ...abstractPromptMachine(prompt),
+        initial: 'prompt',
+        states: {
+            prompt: {
+                ...abstractPromptMachine(prompt)
+            },
+            verify: {
+                ...binaryPromptMachine([getVerificationRequest(category)], '#' + target, 'prompt')
+            }
+        },
         on: {
             RECOGNISED: [
                 {
                     target: target,
-                    cond: (context) => verifyUtterance(context.recResult[0].utterance, category),
-                    actions: {...getAssignActionFor(category)}
+                    cond: (context) =>
+                        verifyUtterance(context.recResult[0].utterance, category)
+                        && context.recResult[0].confidence > CONFIDENCE_THRESHOLD,
+                    actions: {
+                        ...getAssignActionFor(category)
+                    }
+                },
+                {
+                    target: '.verify',
+                    cond: (context) =>
+                        verifyUtterance(context.recResult[0].utterance, category)
+                        && context.recResult[0].confidence < CONFIDENCE_THRESHOLD,
+                    actions: {
+                        ...getAssignActionFor(category)
+                    }
                 }
             ],
             TIMEOUT: {
-                target: '.hist',
+                target: '.prompt.hist',
                 actions: send('HIST')
             }
         }
@@ -513,6 +550,7 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
                         () => "How should I call the meeting?",
                         () => "What is the purpose?"
                     ], "title", 'getDay'),
+                    id: 'getTitle'
                 },
                 getDay: {
                     ...categoryPromptMachine([
@@ -520,13 +558,15 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
                         () => "Which day?",
                         (context) => `${context.username}?`
                     ], "day", 'wholeDay'),
+                    id: 'getDay'
                 },
                 wholeDay: {
                     ...binaryPromptMachine([
                         () => 'Will it take the whole day?',
                         () => 'For the whole day?',
                         () => 'Is it the whole day?'
-                    ], 'confirmation', 'getTime')
+                    ], 'confirmation', 'getTime'),
+                    id: 'wholeDay'
                 },
                 getTime: {
                     ...categoryPromptMachine([
@@ -534,6 +574,7 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
                         () => "At which time?",
                         () => "When should is start?"
                     ], "time", 'confirmation'),
+                    id: 'getTime'
                 },
                 confirmation: {
                     ...binaryPromptMachine(
@@ -541,11 +582,13 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
                             `Do you want me to create a meeting titled ${context.title} on ${context.day} `
                             + `${context.time !== undefined ? `at ${context.time}` : `for the whole day`}?`],
                         'info',
-                        'welcome')
+                        'welcome'),
+                    id: 'confirmation'
                 },
                 info: {
                     entry: say(() => "Your meeting has been created!"),
-                    on: {ENDSPEECH: 'welcome'}
+                    on: {ENDSPEECH: 'welcome'},
+                    id: 'info'
                 }
             }
         }
