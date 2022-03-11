@@ -1,14 +1,4 @@
-import {
-    Action,
-    ActionTypes,
-    assign,
-    AssignAction, HistoryStateNode,
-    MachineConfig,
-    PropertyAssigner,
-    send,
-    State,
-    StateNode, StateNodeDefinition, StatesConfig,
-} from "xstate";
+import {Action, ActionTypes, assign, AssignAction, MachineConfig, PropertyAssigner, send, StatesConfig,} from "xstate";
 
 function say(text: (context: SDSContext) => string): Action<SDSContext, any> {
     return send((_context: SDSContext) => ({type: "SPEAK", value: text(_context)}))
@@ -34,6 +24,13 @@ const menuGrammar: { [index: string]: { description: string, patterns: Array<Reg
         patterns: [
             /Stop./,
             /Shut up./
+        ]
+    },
+    "homeAssistant": {
+        description: "ask me for home assistance",
+        patterns: [
+            /Can you help me with home assistance/,
+            /Assist me in my home/
         ]
     },
     "options": {
@@ -128,7 +125,30 @@ function abstractPromptMachine(prompt: ((context: SDSContext) => string)[]): Mac
     return {
         initial: 'prompt0',
         states: {
-            ...getPrompts(prompt)
+            ...getPrompts(prompt),
+            verification: {
+                states:{
+                    ask: {
+                        entry: say(() => 'verification'),
+                        on: {
+                            RECOGNISED: [
+                                {
+                                    target: {value: 'as'},
+                                    cond: (context) => binaryGrammar["Yes"].includes(context.recResult[0].utterance)
+                                },
+                                {
+                                    target: 'prompt0',
+                                    cond: (context) => binaryGrammar["No"].includes(context.recResult[0].utterance)
+                                }
+                            ],
+                        }
+                    },
+                    listen: {
+
+                    }
+                }
+
+            }
         }
     }
 }
@@ -319,6 +339,10 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
                                 })
                             },
                             {
+                                target: 'homeAssistant',
+                                cond: context => menuGrammar["homeAssistant"]["patterns"].some((regex) => regex.test(context.recResult[0].utterance))
+                            },
+                            {
                                 target: 'menuHelp',
                                 cond: context => menuGrammar["options"]["patterns"].some((regex) => regex.test(context.recResult[0].utterance))
                             },
@@ -342,6 +366,101 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
                     }),
                     on: {
                         ENDSPEECH: "welcome.hist"
+                    }
+                },
+                homeAssistant: {
+                    initial: 'ask',
+                    states: {
+                        ask: {
+                            ...abstractPromptMachine(
+                                [
+                                    () => 'How can I assist you?',
+                                    () => 'How may I help you?',
+                                    (context) => `${context.username}?`
+                                ]),
+                            on: {
+                                RECOGNISED: 'invokeRasa',
+                                TIMEOUT: {
+                                    target: '.hist',
+                                    actions: send('HIST')
+                                }
+                            }
+                        },
+                        invokeRasa: {
+                            invoke: {
+                                src: context => nluRequest(context.recResult[0].utterance),
+                                onDone: [
+                                    {
+                                        cond: (_, event) => event.data['intent']['name'] === 'vacuum',
+                                        target: 'vacuum'
+                                    },
+                                    {
+                                        cond: (_, event) => event.data['intent']['name'] === 'move_to_trash',
+                                        target: 'moveToTrash'
+                                    },
+                                    {
+                                        cond: (_, event) => event.data['intent']['name'] === 'give',
+                                        target: 'give'
+                                    },
+                                    {
+                                        cond: (_, event) => event.data['intent']['name'] === 'turn_on_light',
+                                        target: 'turnOnLight'
+                                    },
+                                    {
+                                        cond: (_, event) => event.data['intent']['name'] === 'turn_off_light',
+                                        target: 'turnOffLight'
+                                    },
+                                    {
+                                        cond: (_, event) => event.data['intent']['name'] === 'cook',
+                                        target: 'cook'
+                                    },
+                                    {
+                                        cond: (_, event) => event.data['intent']['name'] === 'ask_oven_warm',
+                                        target: 'askOvenWarm'
+                                    },
+                                    {
+                                        cond: (_, event) => event.data['intent']['name'] === 'inform_oven_warm',
+                                        target: 'informOvenWarm'
+                                    }
+                                ],
+                                onError: 'ask.hist'
+                            }
+                        },
+                        vacuum: {
+                            entry: say(() => 'I will clean the floor.'),
+                            always: 'ask'
+                        },
+                        moveToTrash: {
+                            entry: say(() => 'I will throw it into the trash.'),
+                            always: 'ask'
+                        },
+                        give: {
+                            entry: say(() => 'I will give it to them.'),
+                            always: 'ask'
+                        },
+                        turnOnLight: {
+                            entry: say(() => "I'll turn off the light."),
+                            always: 'ask'
+                        },
+                        turnOffLight: {
+                            entry: say(() => 'I will turn on the light.'),
+                            always: 'ask'
+                        },
+                        cook: {
+                            entry: say(() => 'I will prepare the meal.'),
+                            always: 'ask'
+                        },
+                        askOvenWarm: {
+                            entry: say(() => {
+                                let responses = ['The oven is warm.', 'The oven is cold.'];
+                                return responses[Math.random() * responses.length | 0]
+                            }),
+                            always: 'ask'
+                        },
+                        informOvenWarm: {
+                            entry: say(() => 'Ok, thanks.'),
+                            always: 'ask'
+                        }
                     }
                 },
                 askForCelebrity: {
@@ -430,6 +549,13 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
     }
 })
 
+const rasaurl = 'https://rasa-nlu-api-00.herokuapp.com/model/parse';
+const nluRequest = (text: string) =>
+    fetch(new Request(rasaurl, {
+        method: 'POST',
+        body: `{"text": "${text}"}`
+    }))
+        .then(data => data.json());
 
 const kbRequest = (text: string) =>
     fetch(new Request(`https://cors.eu.org/https://api.duckduckgo.com/?q=${text}&format=json&skip_disambig=1`)).then(data => data.json())
