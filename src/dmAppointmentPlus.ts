@@ -125,30 +125,7 @@ function abstractPromptMachine(prompt: ((context: SDSContext) => string)[]): Mac
     return {
         initial: 'prompt0',
         states: {
-            ...getPrompts(prompt),
-            verification: {
-                states:{
-                    ask: {
-                        entry: say(() => 'verification'),
-                        on: {
-                            RECOGNISED: [
-                                {
-                                    target: {value: 'as'},
-                                    cond: (context) => binaryGrammar["Yes"].includes(context.recResult[0].utterance)
-                                },
-                                {
-                                    target: 'prompt0',
-                                    cond: (context) => binaryGrammar["No"].includes(context.recResult[0].utterance)
-                                }
-                            ],
-                        }
-                    },
-                    listen: {
-
-                    }
-                }
-
-            }
+            ...getPrompts(prompt)
         }
     }
 }
@@ -421,6 +398,10 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
                                     {
                                         cond: (_, event) => event.data['intent']['name'] === 'inform_oven_warm',
                                         target: 'informOvenWarm'
+                                    },
+                                    {
+                                        cond: (_, event) => event.data['intent']['name'] === 'stop',
+                                        target: 'stop'
                                     }
                                 ],
                                 onError: 'ask.hist'
@@ -428,38 +409,60 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
                         },
                         vacuum: {
                             entry: say(() => 'I will clean the floor.'),
-                            always: 'ask'
+                            on: {
+                                ENDSPEECH: 'ask'
+                            }
                         },
                         moveToTrash: {
                             entry: say(() => 'I will throw it into the trash.'),
-                            always: 'ask'
+                            on: {
+                                ENDSPEECH: 'ask'
+                            }
                         },
                         give: {
                             entry: say(() => 'I will give it to them.'),
-                            always: 'ask'
+                            on: {
+                                ENDSPEECH: 'ask'
+                            }
                         },
                         turnOnLight: {
-                            entry: say(() => "I'll turn off the light."),
-                            always: 'ask'
+                            entry: say(() => "I'll turn on the light."),
+                            on: {
+                                ENDSPEECH: 'ask'
+                            }
                         },
                         turnOffLight: {
-                            entry: say(() => 'I will turn on the light.'),
-                            always: 'ask'
+                            entry: say(() => 'I will turn off the light.'),
+                            on: {
+                                ENDSPEECH: 'ask'
+                            }
                         },
                         cook: {
                             entry: say(() => 'I will prepare the meal.'),
-                            always: 'ask'
+                            on: {
+                                ENDSPEECH: 'ask'
+                            }
                         },
                         askOvenWarm: {
                             entry: say(() => {
                                 let responses = ['The oven is warm.', 'The oven is cold.'];
                                 return responses[Math.random() * responses.length | 0]
                             }),
-                            always: 'ask'
+                            on: {
+                                ENDSPEECH: 'ask'
+                            }
                         },
                         informOvenWarm: {
                             entry: say(() => 'Ok, thanks.'),
-                            always: 'ask'
+                            on: {
+                                ENDSPEECH: 'ask'
+                            }
+                        },
+                        stop: {
+                            entry: say(() => 'Alright.'),
+                            on: {
+                                ENDSPEECH: '#root.dm.dialogue.welcome'
+                            }
                         }
                     }
                 },
@@ -549,7 +552,7 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
     }
 })
 
-const rasaurl = 'https://rasa-nlu-api-00.herokuapp.com/model/parse';
+const rasaurl = 'https://speechstate-lt2216-kuenkele.herokuapp.com/model/parse';
 const nluRequest = (text: string) =>
     fetch(new Request(rasaurl, {
         method: 'POST',
