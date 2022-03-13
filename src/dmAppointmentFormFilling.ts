@@ -1,5 +1,15 @@
-import {Action, assign, MachineConfig, send,} from "xstate";
+import {Action, assign, doneInvoke, MachineConfig, send,} from "xstate";
 import {StatesConfig} from "xstate/lib/types";
+import {raise} from "xstate/lib/actions";
+import {done} from "xstate/es/actions";
+
+type rasa_response_entity = {
+    entity: string,
+    start: number,
+    end: number,
+    value: string,
+    extractor: string
+}
 
 function say(text: (context: SDSContext) => string): Action<SDSContext, any> {
     return send((_context: SDSContext) => ({type: "SPEAK", value: text(_context)}))
@@ -139,35 +149,43 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
                                 'final')
                         },
                         final: {
-                            entry: send('COMPLETE')
+                            type: 'final'
                         }
-                    }
+                    },
+                    onDone: 'final'
                 },
                 parseUtterance: {
                     id: 'parseUtterance',
-                    entry: assign({
-                        title: context => {
-                            let regexPattern = /(Create (.*?))?((on |On )(.*?))?((at |At )(.*?))?\./;
-                            let regexExec = regexPattern.exec(context.recResult[0].utterance)!;
-                            return regexExec && regexExec[2] !== undefined ? regexExec[2] : context.title
-                        },
-                        day: context => {
-                            let regexPattern = /(Create (.*?))?((on |On )(.*?))?((at |At )(.*?))?\./;
-                            let regexExec = regexPattern.exec(context.recResult[0].utterance)!;
-                            return regexExec && regexExec[5] !== undefined ? regexExec[5] : context.day
-                        },
-                        time: context => {
-                            let regexPattern = /(Create (.*?))?((on |On )(.*?))?((at |At )(.*?))?\./;
-                            let regexExec = regexPattern.exec(context.recResult[0].utterance)!;
-                            return regexExec && regexExec[8] !== undefined ? regexExec[8] : context.time
-                        },
-                    }),
-                    always: 'fetchInformation.hist'
+                    invoke: {
+                        src: context => nluRequest(context.recResult[0].utterance),
+                        onDone: [
+                            {
+                                cond: (_, event) => event.data['intent']['name'] === 'create_meeting',
+                                actions: assign({
+                                    title: (context, event) => {
+                                        let entity: rasa_response_entity = event.data['entities'].find((element: rasa_response_entity) => element.entity === 'title')
+                                        return entity && entity.value !== undefined ? entity.value : context.title
+                                    },
+                                    day: (context, event) => {
+                                        let entity: rasa_response_entity = event.data['entities'].find((element: rasa_response_entity) => element.entity === 'day')
+                                        return entity && entity.value !== undefined ? entity.value : context.day
+                                    },
+                                    time: (context, event) => {
+                                        let entity: rasa_response_entity = event.data['entities'].find((element: rasa_response_entity) => element.entity === 'time')
+                                        return entity && entity.value !== undefined ? entity.value : context.time
+                                    },
+                                }),
+                                target: 'fetchInformation.hist'
+                            }
+                        ],
+                        onError: 'fetchInformation.hist'
+                    }
+                },
+                final: {
+                    type: 'final'
                 }
             },
-            on: {
-                COMPLETE: 'confirmation'
-            }
+            onDone: 'confirmation'
         },
         confirmation: {
             ...binaryPromptMachine(
@@ -184,3 +202,10 @@ export const dmMachine: MachineConfig<SDSContext, any, SDSEvent> = ({
     }
 })
 
+const rasaurl = 'https://speechstate-kuenkele-form.herokuapp.com/model/parse';
+const nluRequest = (text: string) =>
+    fetch(new Request(rasaurl, {
+        method: 'POST',
+        body: `{"text": "${text}"}`
+    }))
+        .then(data => data.json());
