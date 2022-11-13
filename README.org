@@ -1,4 +1,8 @@
 #+TITLE: Dialogue systems '2022
+> Part of the Master in Language Technology at the University of Gothenburg
+>
+> **Course:** Dialogue Systems (LT2216)
+
 * Overview
 You will have 4 labs:
 
